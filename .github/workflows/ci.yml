@@ -1,0 +1,51 @@
+name: CI - Build & Test
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+
+jobs:
+  build_test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------- Client (Angular) ----------
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: inventorysystem.client/package-lock.json
+
+      - name: Install client deps
+        working-directory: inventorysystem.client
+        run: npm ci
+
+      - name: Build Angular (prod)
+        working-directory: inventorysystem.client
+        run: |
+          # If you don't have the CLI globally:
+          npx ng build --configuration production
+          # NOTE: Output path may be dist/<project-name> or dist/<project-name>/browser.
+          # Adjust the copy step in the CD workflow if needed.
+
+      # ---------- Server (.NET) ----------
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"   # use the SDK you target (6.x/7.x/8.x)
+
+      - name: Restore (NuGet)
+        run: dotnet restore InventorySystem.sln
+
+      - name: Build (Release)
+        run: dotnet build InventorySystem.sln --configuration Release --no-restore
+
+      - name: Test
+        run: |
+          # If you have test projects, this finds and runs them.
+          dotnet test InventorySystem.sln --configuration Release --no-build --verbosity normal
